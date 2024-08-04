@@ -1,18 +1,21 @@
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.filters import SearchFilter
-from .models import Product, Stock
-from .serializers import ProductSerializer, StockSerializer
+from rest_framework import viewsets
+from .models import Stock, Product
+from .serializers import StockSerializer, ProductSerializer
+from .pagination import StandardResultsSetPagination
+from django_filters.rest_framework import DjangoFilterBackend
 
 
-class ProductViewSet(ModelViewSet):
-    queryset = Product.objects.all()
-    serializer_class = ProductSerializer
-    filter_backends = [SearchFilter]
-    search_fields = ['title', 'description']
-
-
-class StockViewSet(ModelViewSet):
+class StockViewSet(viewsets.ModelViewSet):
     queryset = Stock.objects.all()
     serializer_class = StockSerializer
-    filter_backends = [SearchFilter]
-    search_fields = ['positions__product__id']
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['name']
+
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['name', 'description']
