@@ -1,33 +1,51 @@
 from rest_framework import serializers
-from .models import Stock, Product
 
-
-class StockSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Stock
-        fields = ['id', 'name']
-
-    def create(self, validated_data):
-        stock, created = Stock.objects.update_or_create(name=validated_data['name'], defaults=validated_data)
-        return stock
-
-    def update(self, instance, validated_data):
-        instance.name = validated_data.get('name', instance.name)
-        instance.save()
-        return instance
+from .models import Product, Stock, StockProduct
 
 
 class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'title', 'description']
+
+
+class ProductPositionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = StockProduct
+        fields = ['product', 'quantity', 'price']
+
+    def validate(self, data):
+        if not data.get('product'):
+            raise serializers.ValidationError({'Ошибка'})
+        return data
+
+
+class StockSerializer(serializers.ModelSerializer):
+    positions = ProductPositionSerializer(many=True, read_only=False)
+
+    class Meta:
+        model = Stock
+        fields = ['id', 'address', 'positions']
 
     def create(self, validated_data):
-        product, created = Product.objects.update_or_create(name=validated_data['name'], defaults=validated_data)
-        return product
+        positions = validated_data.pop('positions')
+        stock = super().create(validated_data)
+        for position in positions:
+            try:
+                StockProduct.objects.create(stock=stock, **position)
+            except Exception as e:
+                raise serializers.ValidationError({'positions': str(e)})
+        return stock
 
     def update(self, instance, validated_data):
-        instance.name = validated_data.get('name', instance.name)
-        instance.description = validated_data.get('description', instance.description)
-        instance.save()
-        return instance
+        positions = validated_data.pop('positions')
+        stock = super().update(instance, validated_data)
+        for position in positions:
+            try:
+                obj, created = StockProduct.objects.get_or_create(stock=stock, product=position['product'])
+                obj.quantity = position['quantity']
+                obj.price = position['price']
+                obj.save()
+            except Exception as e:
+                raise serializers.ValidationError({'positions': str(e)})
+        return stock
